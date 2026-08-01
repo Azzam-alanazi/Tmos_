@@ -513,9 +513,11 @@ const CONFIG = {
   /* Remembers volume, achievements and last scene. No-ops inside Claude artifacts. */
   remember: true,
 
-  /* analyser:false if your audio host doesn't send CORS headers — kills the visualizer
-     and beat reactivity but guarantees the music plays. Auto-detected either way. */
-  audio: { volume:.45, autoplay:true, fadeMs:420, loopScene:true, analyser:true },
+  /* Fivemanage R2 sends no Access-Control-Allow-Origin header, so the analyser can't read
+     these files — analyser:false skips the doomed CORS attempt and the music just plays.
+     Move the MP3s into this repo (they're small enough for GitHub) and flip this back to
+     true to get the visualizer and beat-reactive glow working again. */
+  audio: { volume:.45, autoplay:true, fadeMs:420, loopScene:true, analyser:false },
   views: { enabled:true, endpoint:"https://api.counterapi.dev/v1/azzam-bio/home/up", fallback:1337 },
   particles: { enabled:true, count:55, linkDistance:120, speed:.26, repel:100 },
 
@@ -901,6 +903,7 @@ audio.addEventListener('error', () => {
   const src = audio.src;
   if(!triedNoCors && audio.crossOrigin && isRemote(src) && !vizOn){
     triedNoCors = true; analyserOK = false;
+    $('viz').style.display = 'none';
     playNote = 'audio host sends no CORS header → visualizer + beat disabled, music still plays';
     console.warn('[audio] ' + playNote);
     audio.removeAttribute('crossorigin');
@@ -991,7 +994,14 @@ function initDiscord(){
   const C = CONFIG.discord;
   if(!C.enabled || !/^\d{17,20}$/.test(C.userId)) return;
   const poll = () => fetch(`https://api.lanyard.rest/v1/users/${C.userId}`)
-    .then(r => r.json()).then(j => j.success && renderPresence(j.data)).catch(()=>{});
+    .then(r => r.json())
+    .then(j => {
+      if(j.success) return renderPresence(j.data);
+      console.warn('[discord] Lanyard has no record of ' + C.userId +
+        '\n   → join https://discord.gg/lanyard with THIS account so their bot can see your presence,' +
+        '\n     or double-check the ID (Settings ▸ Advanced ▸ Developer Mode ▸ right-click yourself ▸ Copy User ID)');
+    })
+    .catch(()=>{});
   poll();
   if(!C.live) { setInterval(poll, 30000); return; }
   try{
@@ -1302,6 +1312,7 @@ function startViz(){
       if(!audio.paused && audio.currentTime > 1.2){
         if(sum === 0){ if(++silentFrames === 90){
           analyserOK = false;
+          $('viz').style.display = 'none';
           playNote = 'analyser reads silence — audio host sends no CORS header. Set audio.analyser:false';
           console.warn('[audio] ' + playNote);
           document.documentElement.style.setProperty('--beat', 0);
@@ -1346,7 +1357,12 @@ function typeLoop(){
 function assetReport(){
   const abs = p => p ? new URL(p, location.href).href : '—';
   console.log('%c asset paths ', 'background:#d4af37;color:#05070f;font-weight:700');
-  console.table(S.map(s => ({ scene:s.label, video:abs(s.video), poster:abs(s.poster), audio:abs(s.track.src) })));
+  console.table(S.map(s => ({
+    scene:  s.label,
+    video:  abs(s.video),
+    poster: s.poster ? abs(s.poster) : '—',
+    tracks: (s.tracks || (s.track ? [s.track] : [])).map(t => abs(t.src)).join('   |   ') || '—'
+  })));
   console.log('cursor →', abs(CONFIG.cursor.gif));
   if(location.protocol === 'file:')
     console.warn('You opened this with file:// — some browsers refuse to load local video/audio this way.\n   Run:  python3 -m http.server   then visit http://localhost:8000');
@@ -1364,7 +1380,7 @@ function enter(){
   SFX.muted = audio.muted;
   $('vol').value = Math.round(targetVol * 100);
   paintMute();
-  if(CONFIG.debug) assetReport();
+  if(CONFIG.debug){ try{ assetReport(); }catch(err){ console.warn('[debug] assetReport skipped:', err.message); } }
 
   const start = Math.min(Math.max(0, store.get('scene', 0)), S.length - 1);
   idx = start; seen.add(start);
@@ -1378,6 +1394,7 @@ function enter(){
   $('sceneLabel').textContent = S[start].label;
   if(S[start].cursor) setCursorGif(S[start].cursor);
 
+  if(!analyserOK) $('viz').style.display = 'none';
   loadTrack(0, { play: CONFIG.audio.autoplay });
 
   if(S.length > 1){ hintT = setTimeout(() => $('hint').classList.add('on'), 1600); setTimeout(killHint, 8000); }
