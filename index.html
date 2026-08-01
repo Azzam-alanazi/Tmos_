@@ -716,6 +716,8 @@ const vids = S.map((s, i) => {
   v.dataset.src = s.video;
   v.setAttribute('aria-hidden','true');
 
+  ['loadedmetadata','loadeddata','canplay','canplaythrough','progress','suspend','playing']
+    .forEach(ev => v.addEventListener(ev, () => { if(vids[idx] === v) tryPlay(v, ev); }));
   v.addEventListener('error', () => {
     state[i] = 'fail'; paintDebug();
     v.style.display = 'none';                       // kill the broken-image icon
@@ -750,7 +752,10 @@ function paintDebug(){
     let play = '';
     if(state[i] === 'ok' && v && v.tagName === 'VIDEO'){
       const dur = isFinite(v.duration) ? v.duration.toFixed(1) : '?';
-      play = v.paused ? `  [PAUSED ${dur}s]` : `  [playing ${v.currentTime.toFixed(1)}/${dur}s]`;
+      const buf = v.buffered.length ? ((v.buffered.end(v.buffered.length-1) / (v.duration||1)) * 100).toFixed(0) : 0;
+      play = v.paused
+        ? `  [PAUSED ${dur}s  rs${v.readyState} ns${v.networkState} buf${buf}%]`
+        : `  [playing ${v.currentTime.toFixed(1)}/${dur}s  buf${buf}%]`;
     }
     const where = isRemote(s.video) ? ' [remote]' : '';
     const name = s.video.length > 42 ? '…' + s.video.slice(-41) : s.video;
@@ -791,24 +796,26 @@ function toggleCard(){
 }
 
 let playNote = '';
-function playScene(i){
-  const v = vids[i];
-  if(!v || v.tagName !== 'VIDEO') return;
+function tryPlay(v, tag){
+  if(!v || v.tagName !== 'VIDEO' || !v.paused) return;
   if(reduced && !CONFIG.motion.forceVideo){
     playNote = 'reduced-motion is ON → video autoplay disabled (CONFIG.motion.forceVideo)';
     return paintDebug();
   }
-  v.muted = true;                                  // muted is what makes autoplay legal
-  const attempt = () => v.play().then(() => { playNote = ''; paintDebug(); })
+  v.muted = true;                                   // muted is what makes autoplay legal
+  const p = v.play();
+  if(p && p.then) p.then(() => { playNote = ''; paintDebug(); })
     .catch(err => {
-      playNote = `play() rejected: ${err.name} — ${err.message}`;
+      playNote = `play() rejected @${tag}: ${err.name} — ${err.message}`;
       console.warn('[scene] ' + playNote);
       paintDebug();
-      addEventListener('pointerdown', attempt, { once:true });   // retry on next interaction
     });
-  if(v.readyState >= 2) attempt();
-  else v.addEventListener('canplay', attempt, { once:true });
 }
+/* canplay can never fire on a slow or badly-muxed remote file, so don't depend on it:
+   try immediately, on every buffering milestone, on any click, and on a repeating timer. */
+function playScene(i){ tryPlay(vids[i], 'start'); }
+addEventListener('pointerdown', () => tryPlay(vids[idx], 'click'));
+setInterval(() => { const v = vids[idx]; if(v && v.tagName === 'VIDEO' && v.paused) tryPlay(v, 'retry'); }, 2500);
 
 let particleRGB = S[0].theme.particle;
 function applyTheme(t){
