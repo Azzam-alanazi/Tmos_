@@ -370,9 +370,9 @@ body.gifcur *{ cursor:none !important }
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="16" height="16"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         </div>
         <div class="meta"><div class="track" id="tTitle">—</div><div class="artist" id="tArtist">—</div></div>
-        <button class="ctrl" id="prev" aria-label="Previous scene"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3 6l9-6v12z"/></svg></button>
+        <button class="ctrl" id="prev" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3 6l9-6v12z"/></svg></button>
         <button class="ctrl" id="play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
-        <button class="ctrl" id="next" aria-label="Next scene"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18V6l9 6z"/></svg></button>
+        <button class="ctrl" id="next" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18V6l9 6z"/></svg></button>
       </div>
       <canvas id="viz"></canvas>
       <div class="seek">
@@ -423,6 +423,8 @@ body.gifcur *{ cursor:none !important }
 /* ============================================================
    CONFIG — edit only this block
    ============================================================ */
+const CDN = "https://r2.fivemanage.com/WQZT9MFAnp8HQ9o3pSTtO/";
+
 const CONFIG = {
   profile: {
     name: "Azzam",
@@ -444,41 +446,43 @@ const CONFIG = {
      then put your Discord user ID here (Settings > Advanced > Developer Mode > right-click yourself > Copy User ID) */
   discord: { enabled:true, userId:"670318313569779733", live:true },
 
-  /* Each scene = video + track + its own theme */
+  /* Each scene = one background + its own theme + a playlist.
+     Add more scenes when you upload more videos — nav, swipe and keys pick them up. */
   scenes: [
     {
       label:"midnight",
-      video:"scene1.mp4", poster:"scene1.jpg",
+      video: CDN + "scene1.mp4",
       theme:{ accent:"#d4af37", accent2:"#f0d98a", tintA:"rgba(16,24,51,.50)", tintB:"rgba(6,10,22,.62)",
               particle:"212,175,55", chrome:"#0a0f1e" },
-      track:{ title:"SHhh..", artist:"ME", src:"track1.mp3", cover:"" }
-    },
-    {
+      tracks:[
+        { title:"Track One", artist:"unknown", src: CDN + "track1.mp3" },
+        { title:"Track Two", artist:"unknown", src: CDN + "track2.mp3" }
+      ]
+    }
+    /* template for the next one:
+    ,{
       label:"neon",
-      video:"https://r2.fivemanage.com/WQZT9MFAnp8HQ9o3pSTtO/scene2.mp4", poster:"scene2.jpg",
+      video: CDN + "scene2.mp4",
+      pitch: 1.18,                                  // retunes the UI sounds
+      dim: 0.5,                                     // lighter overlay for dark footage
+      cursor: CDN + "cursor2.gif",
       theme:{ accent:"#ff4fd8", accent2:"#ffb3f0", tintA:"rgba(42,12,54,.52)", tintB:"rgba(12,4,22,.66)",
               particle:"255,79,216", chrome:"#1b0726" },
-      track:{ title:"WHAT CAN I SAY", artist:"eringdbd", src:"track2.mp3", cover:"" }
-    },
-    {
-      label:"rain",
-      video:"scene3.mp4", poster:"scene3.jpg",
-      theme:{ accent:"#5ad8ff", accent2:"#c2f1ff", tintA:"rgba(10,32,46,.52)", tintB:"rgba(4,12,20,.66)",
-              particle:"90,216,255", chrome:"#06131c" },
-      track:{ title:"Track Three", artist:"unknown", src:"track3.mp3", cover:"" }
+      tracks:[ { title:"…", artist:"…", src: CDN + "track3.mp3" } ]
     }
+    */
   ],
 
   socials: [
     { label:"github",  url:"https://github.com/Azzam-alanazi", icon:"github" },
     { label:"spotify", url:"https://open.spotify.com/user/31rqrff5pf2exhht3jcw5x23gmuq", icon:"spotify" },
-    { label:"discord", url:"tmeesah", icon:"discord", copy:true }
+    { label:"discord", url:"azzam", icon:"discord", copy:true }
   ],
 
   /* Animated GIF cursor. Per-scene override: add `cursor:"assets/cursor/x.gif"` to a scene. */
   cursor: {
     enabled:true,
-    gif:"cursor.gif",
+    gif: CDN + "cursor.gif",
     size:44,              // px wide
     hotspot:"center",     // "center" | "tip" (top-left) | {x:12,y:4}
     glow:true,            // themed drop-shadow
@@ -487,7 +491,7 @@ const CONFIG = {
     sparkle:true          // themed sparks in the trail
   },
 
-  debug: false,   // set false once everything works — hides the loader panel
+  debug: true,   // set false once everything works — hides the loader panel
 
   /* 0 = raw footage, 1 = heavily darkened. Per-scene override: add `dim:0.5` to a scene. */
   scrim: 0.7,
@@ -509,7 +513,9 @@ const CONFIG = {
   /* Remembers volume, achievements and last scene. No-ops inside Claude artifacts. */
   remember: true,
 
-  audio: { volume:.45, autoplay:true, fadeMs:420, loopScene:true },
+  /* analyser:false if your audio host doesn't send CORS headers — kills the visualizer
+     and beat reactivity but guarantees the music plays. Auto-detected either way. */
+  audio: { volume:.45, autoplay:true, fadeMs:420, loopScene:true, analyser:true },
   views: { enabled:true, endpoint:"https://api.counterapi.dev/v1/azzam-bio/home/up", fallback:1337 },
   particles: { enabled:true, count:55, linkDistance:120, speed:.26, repel:100 },
 
@@ -683,12 +689,15 @@ function stepBurst(){
 const S = CONFIG.scenes;
 let idx = 0, switching = false, seen = new Set();
 
-const isVideoFile = p => /\.(mp4|webm|ogv|m4v|mov)(\?|#|$)/i.test(p || '');
+/* CDN links (fivemanage, R2, etc.) often carry no file extension, so anything that
+   isn't recognisably an image is treated as video. Force it with `type:"image"` on a scene. */
+const isImageFile = p => /\.(gif|webp|png|jpe?g|avif|bmp|svg)(\?|#|$)/i.test(p || '');
+const layerIsVideo = sc => sc.type ? sc.type === 'video' : !isImageFile(sc.video);
 const state = S.map(() => 'waiting');
 
 const vids = S.map((s, i) => {
   let v;
-  if(isVideoFile(s.video)){
+  if(layerIsVideo(s)){
     v = document.createElement('video');
     v.muted = true; v.loop = true; v.playsInline = true;
     v.setAttribute('muted',''); v.setAttribute('playsinline','');
@@ -741,7 +750,9 @@ function paintDebug(){
       const dur = isFinite(v.duration) ? v.duration.toFixed(1) : '?';
       play = v.paused ? `  [PAUSED ${dur}s]` : `  [playing ${v.currentTime.toFixed(1)}/${dur}s]`;
     }
-    return `${tag}  ${s.video}${i === idx ? ' <' : ''}${play}`;
+    const where = isRemote(s.video) ? ' [remote]' : '';
+    const name = s.video.length > 42 ? '…' + s.video.slice(-41) : s.video;
+    return `${tag}  ${name}${where}${i === idx ? ' <' : ''}${play}`;
   }).join('\n');
 }
 setInterval(() => CONFIG.debug && $('dbg') && paintDebug(), 500);
@@ -812,7 +823,14 @@ function applyTheme(t){
 
 /* ---------------- audio ---------------- */
 const audio = new Audio();
-audio.crossOrigin = 'anonymous'; audio.loop = CONFIG.audio.loopScene; audio.volume = 0;
+/* An analyser can only read audio the host explicitly shares (Access-Control-Allow-Origin).
+   If the host doesn't send it, `crossOrigin` makes the file fail to load outright — so we
+   retry without it and drop the visualizer rather than lose the music. */
+let analyserOK = CONFIG.audio.analyser !== false;
+let triedNoCors = false;
+if(analyserOK) audio.crossOrigin = 'anonymous';
+audio.loop = CONFIG.audio.loopScene; audio.volume = 0;
+const isRemote = u => { try{ return new URL(u, location.href).origin !== location.origin; }catch(_){ return false; } };
 let targetVol = store.get('vol', CONFIG.audio.volume);
 let fadeTimer;
 function fade(to, ms, done){
@@ -843,22 +861,57 @@ function go(i){
   $('sceneLabel').textContent = S[i].label;
   [...$('dots').children].forEach((d,n) => d.classList.toggle('on', n===i));
 
-  const t = S[i].track;
-  $('tTitle').textContent = t.title; $('tArtist').textContent = t.artist;
-  $('cover').innerHTML = t.cover ? `<img src="${t.cover}" alt="">`
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="16" height="16"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
-
-  fade(0, CONFIG.audio.fadeMs, () => {
-    audio.src = t.src;
-    audio.play().then(() => fade(targetVol, CONFIG.audio.fadeMs)).catch(()=>{});
-  });
+  loadTrack(0, { xfade:true });
 
   unlock('swipe');
   if(seen.size === S.length) unlock('tour');
 }
 const nextScene = () => go(idx+1), prevScene = () => go(idx-1);
 
-audio.addEventListener('error', () => { $('tTitle').textContent='Track not found'; $('tArtist').textContent=S[idx]?.track.src||''; });
+/* ---------------- playlist ---------------- */
+const COVER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="16" height="16"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+let tIdx = 0;
+const tracksOf = i => {
+  const sc = S[i] || {};
+  return (sc.tracks && sc.tracks.length) ? sc.tracks : (sc.track ? [sc.track] : []);
+};
+function loadTrack(n, opts){
+  opts = opts || {};
+  const list = tracksOf(idx);
+  if(!list.length) return;
+  tIdx = (n + list.length) % list.length;
+  const t = list[tIdx];
+  $('tTitle').textContent  = t.title;
+  $('tArtist').textContent = t.artist + (list.length > 1 ? `  ·  ${tIdx+1}/${list.length}` : '');
+  $('cover').innerHTML = t.cover ? `<img src="${t.cover}" alt="">` : COVER_SVG;
+  audio.loop = CONFIG.audio.loopScene && list.length === 1;   // a playlist advances instead
+  const swap = () => {
+    audio.src = t.src;
+    if(opts.play !== false)
+      audio.play().then(() => fade(targetVol, opts.xfade ? CONFIG.audio.fadeMs : 900)).catch(()=>{});
+  };
+  if(opts.xfade) fade(0, CONFIG.audio.fadeMs, swap); else swap();
+}
+/* the player's arrows walk the playlist; when there's only one track they change scene */
+const nextTrack = () => tracksOf(idx).length > 1 ? loadTrack(tIdx+1, { xfade:true }) : nextScene();
+const prevTrack = () => tracksOf(idx).length > 1 ? loadTrack(tIdx-1, { xfade:true }) : prevScene();
+audio.addEventListener('ended', () => { if(tracksOf(idx).length > 1) loadTrack(tIdx+1, {}); });
+
+audio.addEventListener('error', () => {
+  const src = audio.src;
+  if(!triedNoCors && audio.crossOrigin && isRemote(src) && !vizOn){
+    triedNoCors = true; analyserOK = false;
+    playNote = 'audio host sends no CORS header → visualizer + beat disabled, music still plays';
+    console.warn('[audio] ' + playNote);
+    audio.removeAttribute('crossorigin');
+    audio.src = src; audio.load(); audio.play().catch(()=>{});
+    paintDebug();
+    return;
+  }
+  $('tTitle').textContent = 'Track not found';
+  $('tArtist').textContent = tracksOf(idx)[tIdx]?.src || '';
+  console.error('[audio] failed →', src);
+});
 audio.addEventListener('loadedmetadata', () => $('dur').textContent = fmt(audio.duration));
 audio.addEventListener('timeupdate', () => {
   $('cur').textContent = fmt(audio.currentTime);
@@ -869,7 +922,7 @@ audio.addEventListener('pause', () => { $('play').innerHTML='<svg viewBox="0 0 2
 const fmt = s => isFinite(s) ? Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0') : '0:00';
 
 $('play').onclick = () => audio.paused ? audio.play().then(()=>fade(targetVol,250)).catch(()=>{}) : fade(0,200,()=>audio.pause());
-$('next').onclick = nextScene; $('prev').onclick = prevScene;
+$('next').onclick = nextTrack; $('prev').onclick = prevTrack;
 $('nextScene').onclick = nextScene; $('prevScene').onclick = prevScene;
 $('bar').onclick = e => { const r = e.currentTarget.getBoundingClientRect();
   if(audio.duration) audio.currentTime = (e.clientX-r.left)/r.width*audio.duration; };
@@ -1220,12 +1273,12 @@ document.addEventListener('pointerover', e => {
 
 /* ---------------- visualizer ---------------- */
 const vc = $('viz'), vctx = vc.getContext('2d');
-let analyser, freq, vizOn = false, beat = 0;
+let analyser, freq, vizOn = false, beat = 0, silentFrames = 0;
 function sizeViz(){ const d = Math.min(devicePixelRatio||1,2);
   vc.width = vc.clientWidth*d; vc.height = 26*d; vctx.setTransform(d,0,0,d,0,0); }
 addEventListener('resize', sizeViz);
 function startViz(){
-  if(vizOn) return;
+  if(vizOn || !analyserOK) return;
   try{
     const actx = getAC(); if(!actx) return;
     analyser = actx.createAnalyser(); analyser.fftSize = 128;
@@ -1246,7 +1299,16 @@ function startViz(){
         vctx.fillRect(i*bw, 26-Math.max(2,v*26), bw-2, Math.max(2,v*26));
       }
       energy = sum/bars;
-      if(CONFIG.reactive.enabled && !reduced){
+      if(!audio.paused && audio.currentTime > 1.2){
+        if(sum === 0){ if(++silentFrames === 90){
+          analyserOK = false;
+          playNote = 'analyser reads silence — audio host sends no CORS header. Set audio.analyser:false';
+          console.warn('[audio] ' + playNote);
+          document.documentElement.style.setProperty('--beat', 0);
+          paintDebug();
+        } } else silentFrames = 0;
+      }
+      if(CONFIG.reactive.enabled && !reduced && analyserOK){
         /* fast attack, slow release — reads as a pulse rather than a flicker */
         beat = Math.max(bass/7, beat * .87);
         document.documentElement.style.setProperty('--beat',
@@ -1316,13 +1378,10 @@ function enter(){
   $('sceneLabel').textContent = S[start].label;
   if(S[start].cursor) setCursorGif(S[start].cursor);
 
-  const t = S[start].track;
-  $('tTitle').textContent = t.title; $('tArtist').textContent = t.artist;
-  if(t.cover) $('cover').innerHTML = `<img src="${t.cover}" alt="">`;
-  audio.src = t.src;
-  if(CONFIG.audio.autoplay) audio.play().then(() => fade(targetVol, 900)).catch(()=>{});
+  loadTrack(0, { play: CONFIG.audio.autoplay });
 
   if(S.length > 1){ hintT = setTimeout(() => $('hint').classList.add('on'), 1600); setTimeout(killHint, 8000); }
+  else { $('dots').style.display = 'none'; $('prevScene').style.display = 'none'; $('nextScene').style.display = 'none'; }
   setTimeout(() => $('gate').remove(), 900);
 }
 $('gate').addEventListener('click', enter, { once:true });
