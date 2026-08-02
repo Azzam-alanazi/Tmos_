@@ -455,19 +455,19 @@ const CONFIG = {
       theme:{ accent:"#d4af37", accent2:"#f0d98a", tintA:"rgba(16,24,51,.50)", tintB:"rgba(6,10,22,.62)",
               particle:"212,175,55", chrome:"#0a0f1e" },
       tracks:[
-        { title:"Track One", artist:"unknown", src: CDN + "track1.mp3" },
+        { title:"Track One", artist:"unknown", src: CDN + "track1.mp3" }
+      ]
+    },
+    {
+      /* theme sampled straight out of the footage — sage green over near-black */
+      label:"grove",
+      video: CDN + "scene2.mp4",
+      pitch: 0.92,
+      theme:{ accent:"#a8d67d", accent2:"#dcf0bd", tintA:"rgba(24,37,27,.52)", tintB:"rgba(8,19,18,.68)",
+              particle:"168,214,125", chrome:"#0d1a12" },
+      tracks:[
         { title:"Track Two", artist:"unknown", src: CDN + "track2.mp3" }
       ]
-    }
-    ,{
-      label:"neon",
-      video: CDN + "https://r2.fivemanage.com/WQZT9MFAnp8HQ9o3pSTtO/scene2.mp4",
-      pitch: 1.18,                                  // retunes the UI sounds
-      dim: 0.5,                                     // lighter overlay for dark footage
-      cursor: CDN + "cursor2.gif",
-      theme:{ accent:"#ff4fd8", accent2:"#ffb3f0", tintA:"rgba(42,12,54,.52)", tintB:"rgba(12,4,22,.66)",
-              particle:"255,79,216", chrome:"#1b0726" },
-      tracks:[ { title:"…", artist:"…", src: CDN + "track3.mp3" } ]
     }
   ],
 
@@ -489,7 +489,7 @@ const CONFIG = {
     sparkle:true          // themed sparks in the trail
   },
 
-  debug: false,   // set false once everything works — hides the loader panel
+  debug: true,   // set false once everything works — hides the loader panel
 
   /* 0 = raw footage, 1 = heavily darkened. Per-scene override: add `dim:0.5` to a scene. */
   scrim: 0.7,
