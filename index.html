@@ -459,10 +459,9 @@ const CONFIG = {
         { title:"Track Two", artist:"unknown", src: CDN + "track2.mp3" }
       ]
     }
-    /* template for the next one:
     ,{
       label:"neon",
-      video: CDN + "scene2.mp4",
+      video: CDN + "https://r2.fivemanage.com/WQZT9MFAnp8HQ9o3pSTtO/scene2.mp4",
       pitch: 1.18,                                  // retunes the UI sounds
       dim: 0.5,                                     // lighter overlay for dark footage
       cursor: CDN + "cursor2.gif",
@@ -470,7 +469,6 @@ const CONFIG = {
               particle:"255,79,216", chrome:"#1b0726" },
       tracks:[ { title:"…", artist:"…", src: CDN + "track3.mp3" } ]
     }
-    */
   ],
 
   socials: [
@@ -491,7 +489,7 @@ const CONFIG = {
     sparkle:true          // themed sparks in the trail
   },
 
-  debug: true,   // set false once everything works — hides the loader panel
+  debug: false,   // set false once everything works — hides the loader panel
 
   /* 0 = raw footage, 1 = heavily darkened. Per-scene override: add `dim:0.5` to a scene. */
   scrim: 0.7,
